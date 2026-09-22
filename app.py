@@ -158,6 +158,8 @@ def extract_face_from_image(image_path):
 def convert_pdf_to_image(pdf_path):
     """Convert first page of PDF to image"""
     try:
+        poppler_path = None
+	if os.name == 'nt':
         poppler_path = r'C:\Users\Rebaona\biometric_service\poppler-26.02.0\Library\bin'
         images = convert_from_path(pdf_path, poppler_path=poppler_path, first_page=1, last_page=1)
         if images:
