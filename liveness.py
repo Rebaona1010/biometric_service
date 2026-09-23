@@ -4,10 +4,8 @@ import math
 
 class LivenessDetector:
     def __init__(self):
-        # Load OpenCV face detector
-        self.face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
+        # Load OpenCV face detector using local haarcascade file
+        self.face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
         
         # Circle parameters
         self.circle_radius = 200
