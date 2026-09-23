@@ -1,10 +1,14 @@
 FROM python:3.10-slim
 
-# Install system dependencies including Poppler
+# Install system dependencies including Poppler and build tools for dlib
 RUN apt-get update && apt-get install -y \
     poppler-utils \
     libgl1 \
     libglib2.0-0 \
+    build-essential \
+    cmake \
+    libopenblas-dev \
+    liblapack-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
