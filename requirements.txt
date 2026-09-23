@@ -1,9 +1,11 @@
 fastapi
 uvicorn
-face_recognition
+deepface
 opencv-python
 opencv-python-headless
 numpy
 pillow
 pdf2image
 python-multipart
+tensorflow
+tf-keras

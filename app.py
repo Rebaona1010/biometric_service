@@ -6,7 +6,6 @@ import os
 import traceback
 from pdf2image import convert_from_path
 import io
-import face_recognition
 from liveness import LivenessDetector
 
 # Only set Poppler path on Windows (local development)
@@ -259,32 +258,19 @@ async def verify_face(
                 "quality_check": True
             }
 
-        # --- FACE VERIFICATION with face_recognition ---
+                # --- FACE VERIFICATION with DeepFace (lightweight) ---
         try:
-            # Load images
-            id_img = face_recognition.load_image_file(id_path)
-            selfie_img = face_recognition.load_image_file(selfie_path)
+            from deepface import DeepFace
             
-            # Get face encodings
-            id_encodings = face_recognition.face_encodings(id_img)
-            selfie_encodings = face_recognition.face_encodings(selfie_img)
-            
-            if len(id_encodings) == 0:
-                return {"status": "error", "message": "No face found in ID image"}
-            if len(selfie_encodings) == 0:
-                return {"status": "error", "message": "No face found in selfie"}
-            
-            # Compare faces
-            id_encoding = id_encodings[0]
-            selfie_encoding = selfie_encodings[0]
-            
-            # Calculate distance
-            face_distance = face_recognition.face_distance([id_encoding], selfie_encoding)[0]
-            
-            # Check if match (threshold 0.6 is standard)
-            face_match = face_distance < 0.6
-            distance = float(face_distance)
-            
+            verification_result = DeepFace.verify(
+                img1_path=id_path,
+                img2_path=selfie_path,
+                model_name='VGG-Face',
+                detector_backend='opencv',
+                enforce_detection=False
+            )
+            face_match = verification_result['verified']
+            distance = float(verification_result['distance'])
             print(f"Face verification: {'MATCH' if face_match else 'NO MATCH'} (distance: {distance})")
             
         except Exception as verify_error:
