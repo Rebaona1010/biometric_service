@@ -275,6 +275,19 @@ async def verify_face(
             temp_selfie.write(await selfie_image.read())
             selfie_path = temp_selfie.name
         
+        # --- RESIZE SELFIE (for consistent liveness check) ---
+        selfie_img = cv2.imread(selfie_path)
+        if selfie_img is not None:
+            h, w = selfie_img.shape[:2]
+            max_size = 640
+            if w > max_size or h > max_size:
+                scale = max_size / max(w, h)
+                new_w = int(w * scale)
+                new_h = int(h * scale)
+                resized = cv2.resize(selfie_img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                cv2.imwrite(selfie_path, resized)
+                print(f"Selfie resized from {w}x{h} to {new_w}x{new_h}")
+        
         print(f"ID image saved to: {id_path}")
         print(f"Selfie saved to: {selfie_path}")
         
