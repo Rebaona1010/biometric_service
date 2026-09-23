@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 deepface
-opencv-python
+opencv-python==4.10.0.84
 numpy
 pillow
 pdf2image
