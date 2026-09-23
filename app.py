@@ -49,9 +49,7 @@ def validate_id_image_quality(image_path):
             return False, "Image is blurry. Please take a clearer photo with better lighting."
         
         # Detect face using OpenCV
-        face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
+        face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
         
         # Try with scaled image for better detection
         scale = 2
@@ -98,10 +96,8 @@ def extract_face_from_image(image_path):
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
-        # Use OpenCV face detector with adjusted parameters
-        face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
+        # Use OpenCV face detector
+        face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
         
         # Detect faces with more sensitive parameters
         faces = face_cascade.detectMultiScale(
