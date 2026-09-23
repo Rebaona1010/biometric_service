@@ -1,28 +1,19 @@
-# Use Alpine Linux - lighter and fewer OpenCV conflicts
-FROM python:3.10-alpine
+FROM python:3.10-slim
 
-# Install system dependencies for OpenCV, PDF, and compilation
-RUN apk add --no-cache \
+# Install system dependencies for OpenCV and PDF
+RUN apt-get update && apt-get install -y \
     poppler-utils \
-    build-base \
-    cmake \
-    libjpeg-turbo-dev \
-    libpng-dev \
-    tiff-dev \
-    libwebp-dev \
-    openblas-dev \
-    linux-headers \
     libgl1 \
     libglib2.0-0 \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy requirements first (for caching)
+# Copy requirements first
 COPY requirements.txt .
 
-# Install Python dependencies WITHOUT cache
-RUN pip install --no-cache-dir -r requirements.txt
+# Cache bust: 2026-09-24-v7
+RUN pip install --no-cache-dir --force-reinstall -r requirements.txt
 
 # Copy the rest of the app
 COPY . .
