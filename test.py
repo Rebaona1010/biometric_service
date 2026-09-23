@@ -1,10 +1,10 @@
 import requests
 import os
 
-id_image_path = r"C:\Users\Rebaona\Downloads\Verify.pdf"
+id_image_path = r"C:\Users\Rebaona\Downloads\ID.jpeg"
 selfie_image_path = r"C:\Users\Rebaona\Downloads\selfie_reba.jpeg"
 
-url = "https://biometric-service-nld1.onrender.com/verify"
+url = "https://biometric-service-3ymt.onrender.com/verify"
 
 files = {
     "id_image": open(id_image_path, "rb"),
