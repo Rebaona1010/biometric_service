@@ -18,6 +18,8 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies WITHOUT cache to force correct versions
+# Cache bust: 2026-09-24-v3
+RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the app
