@@ -8,8 +8,8 @@ class LivenessDetector:
         self.face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
         
         # Circle parameters
-        self.circle_radius =400
-        self.tolerance = 0.5
+        self.circle_radius =800
+        self.tolerance = 0.8
         self.min_radius = self.circle_radius * (1 - self.tolerance)
         self.max_radius = self.circle_radius * (1 + self.tolerance)
         
