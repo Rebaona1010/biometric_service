@@ -6,7 +6,6 @@ import os
 import traceback
 from pdf2image import convert_from_path
 import io
-from liveness import LivenessDetector
 
 # Only set Poppler path on Windows (local development)
 if os.name == 'nt':
@@ -27,90 +26,67 @@ def validate_id_image_quality(image_path):
     """Validate ID image quality before processing"""
     try:
         import cv2
-        
+
         # Read the image
         image = cv2.imread(image_path)
         if image is None:
             return False, "Could not read image. Please upload a valid image file."
-        
+
         height, width = image.shape[:2]
-        
+
         # Check minimum size
         if height < 200 or width < 200:
             return False, "Image is too small. Please upload a clearer photo."
-        
+
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
+
         # Check image clarity using Laplacian variance (blur detection)
         laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
         if laplacian_var < 30:
             return False, "Image is blurry. Please take a clearer photo with better lighting."
-        
-        # Detect face using OpenCV
-        face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-        
-        # Try with scaled image for better detection
-        scale = 2
-        scaled_gray = cv2.resize(gray, (0,0), fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-        faces = face_cascade.detectMultiScale(scaled_gray, 1.05, 3, minSize=(50, 50))
-        
-        if len(faces) == 0:
-            return False, "No face detected in the ID photo. Please ensure the photo is clear and contains your face."
-        
-        # Check face size
-        x, y, w, h = max(faces, key=lambda rect: rect[2] * rect[3])
-        if w < 60 or h < 60:
-            return False, "Face is too small. Please upload a closer photo of your ID."
-        
+
         return True, "Image quality check passed"
-        
+
     except Exception as e:
         print(f"Quality check error: {e}")
         return False, f"Error checking image quality: {str(e)}"
 
 # ============================================
-# FACE EXTRACTION FROM ID
+# FACE EXTRACTION FROM ID (using DeepFace)
 # ============================================
 def extract_face_from_image(image_path):
-    """Extract face from image using OpenCV"""
+    """Extract face from image using DeepFace"""
     try:
-        import cv2
-        import numpy as np
-        
-        image = cv2.imread(image_path)
-        if image is None:
-            print("Could not read image")
-            return None
-        
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-        
-        faces = face_cascade.detectMultiScale(gray, 1.05, 3, minSize=(30, 30))
-        
-        if len(faces) == 0:
-            faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(20, 20))
-        
-        if len(faces) == 0:
+        from deepface import DeepFace
+
+        # Use DeepFace to detect and extract face
+        faces = DeepFace.extract_faces(
+            img_path=image_path,
+            detector_backend='opencv',
+            enforce_detection=False
+        )
+
+        if not faces or len(faces) == 0:
             print("No face detected in ID")
             return None
-        
-        x, y, w, h = max(faces, key=lambda rect: rect[2] * rect[3])
-        
-        padding = int(max(w, h) * 0.2)
-        x = max(0, x - padding)
-        y = max(0, y - padding)
-        w = min(image.shape[1] - x, w + padding * 2)
-        h = min(image.shape[0] - y, h + padding * 2)
-        
-        face_roi = image[y:y+h, x:x+w]
-        enlarged_face = cv2.resize(face_roi, (w*2, h*2), interpolation=cv2.INTER_CUBIC)
-        
+
+        # Get the first face
+        face_data = faces[0]
+        face_img = face_data['face']
+
+        # Convert to 0-255 range if needed
+        if face_img.max() <= 1.0:
+            face_img = (face_img * 255).astype(np.uint8)
+        else:
+            face_img = face_img.astype(np.uint8)
+
+        # Save the extracted face
         temp_face = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-        cv2.imwrite(temp_face.name, enlarged_face)
-        print(f"✅ Face extracted and enlarged: {temp_face.name}")
+        cv2.imwrite(temp_face.name, cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR))
+        print(f"✅ Face extracted: {temp_face.name}")
         return temp_face.name
-        
+
     except Exception as e:
         print(f"Face extraction error: {e}")
         return None
@@ -140,13 +116,13 @@ def convert_pdf_to_image(pdf_path):
 def validate_image_file(file: UploadFile):
     """Check if the uploaded file is a valid image by extension"""
     file_extension = os.path.splitext(file.filename)[1].lower()
-    
+
     if file_extension in ALLOWED_EXTENSIONS:
         return True, "image", ""
-    
+
     if file_extension in PDF_EXTENSIONS:
         return True, "pdf", ""
-    
+
     return False, "unknown", f"Unsupported file format: {file_extension}. Allowed: {', '.join(ALLOWED_EXTENSIONS | PDF_EXTENSIONS)}"
 
 # ============================================
@@ -168,22 +144,22 @@ async def verify_face(
     selfie_path = None
     temp_id_path = None
     extracted_face_path = None
-    
+
     try:
         # Validate both files
         valid_id, id_type, msg_id = validate_image_file(id_image)
         valid_selfie, selfie_type, msg_selfie = validate_image_file(selfie_image)
-        
+
         if not valid_id:
             return {"status": "error", "message": msg_id}
         if not valid_selfie:
             return {"status": "error", "message": msg_selfie}
-        
+
         # --- Handle ID Image ---
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf" if id_type == "pdf" else ".jpg") as temp_id:
             temp_id.write(await id_image.read())
             temp_id_path = temp_id.name
-        
+
         if id_type == "pdf":
             id_path = convert_pdf_to_image(temp_id_path)
             if id_path is None:
@@ -193,7 +169,7 @@ async def verify_face(
         else:
             id_path = temp_id_path
             temp_id_path = None
-        
+
         # --- VALIDATE ID IMAGE QUALITY ---
         if id_path:
             quality_ok, quality_message = validate_id_image_quality(id_path)
@@ -208,7 +184,7 @@ async def verify_face(
                     "distance": None
                 }
             print(f"✅ ID image quality check: {quality_message}")
-        
+
         # --- EXTRACT FACE FROM ID ---
         if id_path:
             extracted_face_path = extract_face_from_image(id_path)
@@ -216,15 +192,15 @@ async def verify_face(
                 os.unlink(id_path)
                 id_path = extracted_face_path
                 print(f"✅ Using extracted face for verification")
-        
+
         # --- Handle Selfie ---
         if selfie_type != "image":
             return {"status": "error", "message": "Selfie must be an image file"}
-        
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_selfie:
             temp_selfie.write(await selfie_image.read())
             selfie_path = temp_selfie.name
-        
+
         # --- RESIZE SELFIE ---
         selfie_img = cv2.imread(selfie_path)
         if selfie_img is not None:
@@ -237,31 +213,55 @@ async def verify_face(
                 resized = cv2.resize(selfie_img, (new_w, new_h), interpolation=cv2.INTER_AREA)
                 cv2.imwrite(selfie_path, resized)
                 print(f"Selfie resized from {w}x{h} to {new_w}x{new_h}")
-        
-        # --- LIVENESS DETECTION ---
-        liveness_detector = LivenessDetector()
-        liveness_result = liveness_detector.check_liveness(selfie_path)
 
-        if not liveness_result['passed']:
+        # --- FACE PRESENCE CHECK (replaces liveness) ---
+        try:
+            from deepface import DeepFace
+
+            face_check = DeepFace.extract_faces(
+                img_path=selfie_path,
+                detector_backend='opencv',
+                enforce_detection=True
+            )
+
+            if not face_check or len(face_check) == 0:
+                if id_path and os.path.exists(id_path):
+                    os.unlink(id_path)
+                if selfie_path and os.path.exists(selfie_path):
+                    os.unlink(selfie_path)
+
+                return {
+                    "status": "failed",
+                    "verified": False,
+                    "reason": "No face detected in selfie. Please ensure your face is clearly visible.",
+                    "liveness_passed": False,
+                    "face_match": False,
+                    "distance": None,
+                    "quality_check": True
+                }
+
+            print("✅ Face presence check passed")
+
+        except Exception as face_error:
             if id_path and os.path.exists(id_path):
                 os.unlink(id_path)
             if selfie_path and os.path.exists(selfie_path):
                 os.unlink(selfie_path)
-            
+
             return {
                 "status": "failed",
                 "verified": False,
-                "reason": liveness_result['reason'],
+                "reason": "No face detected in selfie. Please ensure your face is clearly visible.",
                 "liveness_passed": False,
                 "face_match": False,
                 "distance": None,
                 "quality_check": True
             }
 
-                # --- FACE VERIFICATION with DeepFace (lightweight) ---
+        # --- FACE VERIFICATION with DeepFace ---
         try:
             from deepface import DeepFace
-            
+
             verification_result = DeepFace.verify(
                 img1_path=id_path,
                 img2_path=selfie_path,
@@ -272,19 +272,19 @@ async def verify_face(
             face_match = verification_result['verified']
             distance = float(verification_result['distance'])
             print(f"Face verification: {'MATCH' if face_match else 'NO MATCH'} (distance: {distance})")
-            
+
         except Exception as verify_error:
             face_match = False
             distance = None
             print(f"Face verification FAILED: {str(verify_error)}")
             return {"status": "error", "message": f"Face verification failed: {str(verify_error)}"}
-        
+
         # Clean up
         if id_path and os.path.exists(id_path):
             os.unlink(id_path)
         if selfie_path and os.path.exists(selfie_path):
             os.unlink(selfie_path)
-        
+
         if face_match:
             return {
                 "status": "success",
@@ -305,7 +305,7 @@ async def verify_face(
                 "distance": distance,
                 "quality_check": True
             }
-        
+
     except Exception as e:
         try:
             if id_path and os.path.exists(id_path):
@@ -317,10 +317,10 @@ async def verify_face(
                 os.unlink(selfie_path)
         except:
             pass
-        
+
         error_trace = traceback.format_exc()
         print(f"Error: {error_trace}")
-        
+
         return {
             "status": "error",
             "message": str(e),
